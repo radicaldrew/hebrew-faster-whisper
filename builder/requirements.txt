@@ -1,0 +1,13 @@
+runpod~=1.7.9
+
+faster-whisper==1.1.0
+
+# PyTorch (CUDA 12.1 compatible wheels)
+torch>=2.1.0
+torchaudio>=2.1.0
+
+# Speaker diarization
+pyannote.audio>=3.1.0
+
+# Audio download
+requests>=2.28.0

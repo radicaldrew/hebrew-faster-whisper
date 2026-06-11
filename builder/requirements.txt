@@ -6,8 +6,10 @@ faster-whisper==1.1.0
 torch>=2.1.0
 torchaudio>=2.1.0
 
-# Speaker diarization
-pyannote.audio>=3.1.0
+# Speaker diarization — MUST stay <4.0: models.py uses use_auth_token,
+# which pyannote 4.x removed (load fails silently -> diarization dead)
+pyannote.audio>=3.1.0,<4.0
+huggingface_hub>=0.23,<1.0
 
 # Audio download
 requests>=2.28.0

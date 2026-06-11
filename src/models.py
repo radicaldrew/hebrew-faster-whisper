@@ -45,10 +45,18 @@ def load_diarization_pipeline():
         from pyannote.audio import Pipeline
 
         print("Loading pyannote/speaker-diarization-3.1 pipeline...", flush=True)
-        diarization_pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            use_auth_token=hf_token,
-        )
+        try:
+            # pyannote 3.x kwarg
+            diarization_pipeline = Pipeline.from_pretrained(
+                "pyannote/speaker-diarization-3.1",
+                use_auth_token=hf_token,
+            )
+        except TypeError:
+            # pyannote 4.x renamed it to `token`
+            diarization_pipeline = Pipeline.from_pretrained(
+                "pyannote/speaker-diarization-3.1",
+                token=hf_token,
+            )
         if rp_cuda.is_available():
             diarization_pipeline = diarization_pipeline.to(torch.device("cuda"))
             print("Diarization pipeline loaded on CUDA.", flush=True)

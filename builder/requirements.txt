@@ -2,9 +2,10 @@ runpod~=1.7.9
 
 faster-whisper==1.1.0
 
-# PyTorch (CUDA 12.1 compatible wheels)
-torch>=2.1.0
-torchaudio>=2.1.0
+# PyTorch — MUST stay <2.6: torch 2.6 flipped torch.load to
+# weights_only=True, which breaks pyannote 3.x checkpoint loading
+torch>=2.1.0,<2.6
+torchaudio>=2.1.0,<2.6
 
 # Speaker diarization — MUST stay <4.0: models.py uses use_auth_token,
 # which pyannote 4.x removed (load fails silently -> diarization dead)

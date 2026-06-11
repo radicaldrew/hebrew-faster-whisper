@@ -14,6 +14,7 @@ MODEL_ID = "ivrit-ai/whisper-large-v3-turbo-ct2"
 # Global model instances
 whisper_model = None
 diarization_pipeline = None
+diarization_load_error = None
 
 
 def load_whisper_model():
@@ -63,7 +64,9 @@ def load_diarization_pipeline():
         else:
             print("Diarization pipeline loaded on CPU.", flush=True)
     except Exception as e:
-        print(f"ERROR: Failed to load diarization pipeline: {e}", flush=True)
+        global diarization_load_error
+        diarization_load_error = f"{type(e).__name__}: {e}"
+        print(f"ERROR: Failed to load diarization pipeline: {diarization_load_error}", flush=True)
         diarization_pipeline = None
 
 
@@ -77,9 +80,10 @@ def get_whisper_model():
 def get_diarization_pipeline():
     """Get the loaded diarization pipeline."""
     if diarization_pipeline is None:
+        detail = diarization_load_error or "HF_TOKEN not set"
         raise RuntimeError(
-            "Diarization pipeline not loaded. Ensure HF_TOKEN is set and "
-            "pyannote/speaker-diarization-3.1 access is granted."
+            f"Diarization pipeline not loaded ({detail}). Ensure HF_TOKEN is "
+            "set and pyannote/speaker-diarization-3.1 access is granted."
         )
     return diarization_pipeline
 

@@ -120,14 +120,16 @@ def handler(job):
 
 
 def _handle_error(job_input, start_time, code, message):
-    """Build error response and optionally send webhook."""
+    """Build error response and optionally send webhook.
+
+    The returned `error` must be a STRING — RunPod's SDK only marks the job
+    FAILED (and preserves the message in /status) for string errors; a nested
+    dict gets silently dropped and the job reports COMPLETED with no output.
+    """
     print(f"ERROR [{code}]: {message}", flush=True)
 
     error_response = {
-        "error": {
-            "code": code,
-            "message": message,
-        }
+        "error": f"{code}: {message}",
     }
 
     webhook_url = job_input.get("webhook_url")
@@ -136,7 +138,7 @@ def _handle_error(job_input, start_time, code, message):
         webhook_payload = {
             "job_id": job_input.get("job_id"),
             "status": "failed",
-            "error": error_response["error"],
+            "error": {"code": code, "message": message},
             "metadata": {
                 "model": "hebrew",
                 "diarize": job_input.get("diarize", False),

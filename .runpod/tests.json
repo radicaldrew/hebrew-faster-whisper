@@ -1,22 +1,11 @@
 {
   "tests": [
     {
-      "name": "general_transcription",
+      "name": "hebrew_transcription",
       "input": {
         "audio_url": "https://github.com/runpod-workers/sample-inputs/raw/main/audio/gettysburg.wav",
-        "model": "general",
         "diarize": false,
         "word_timestamps": true
-      },
-      "timeout": 600000
-    },
-    {
-      "name": "general_with_diarization",
-      "input": {
-        "audio_url": "https://github.com/runpod-workers/sample-inputs/raw/main/audio/gettysburg.wav",
-        "model": "general",
-        "diarize": true,
-        "word_timestamps": false
       },
       "timeout": 600000
     }

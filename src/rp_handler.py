@@ -2,25 +2,20 @@
 RunPod serverless handler for Hebrew transcription worker.
 """
 
+import time
+
 import runpod
+from runpod.serverless.utils.rp_validator import validate
 
-print(">>> Handler module loaded", flush=True)
+import models
+import predict
+from diarization import run_diarization, align_speakers, count_speakers
+from rp_schema import INPUT_VALIDATIONS
+from utils import download_audio, cleanup_file
+from webhook import send_webhook
 
-_initialized = False
-
-
-def _lazy_init():
-    """Import heavy modules and load models on first request."""
-    global _initialized
-    if _initialized:
-        return
-    print(">>> Initializing worker...", flush=True)
-
-    import models
-    models.setup()
-
-    _initialized = True
-    print(">>> Worker ready", flush=True)
+# Load models at startup (single model, fast load)
+models.setup()
 
 
 def handler(job):
@@ -35,15 +30,6 @@ def handler(job):
         webhook_secret (str, optional): Shared secret for HMAC signing.
         job_id (str, optional): Caller's reference ID for correlation.
     """
-    import time
-    from runpod.serverless.utils.rp_validator import validate
-    import predict
-    from diarization import run_diarization, align_speakers, count_speakers
-    from rp_schema import INPUT_VALIDATIONS
-    from utils import download_audio, cleanup_file
-    from webhook import send_webhook
-
-    _lazy_init()
     start_time = time.time()
     job_input = job["input"]
 
@@ -146,8 +132,6 @@ def _handle_error(job_input, start_time, code, message):
 
     webhook_url = job_input.get("webhook_url")
     if webhook_url:
-        import time
-        from webhook import send_webhook
         processing_time_ms = int((time.time() - start_time) * 1000)
         webhook_payload = {
             "job_id": job_input.get("job_id"),

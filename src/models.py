@@ -5,6 +5,9 @@ Loads ivrit-ai whisper CT2 model and pyannote diarization pipeline.
 """
 
 import os
+import torch
+from faster_whisper import WhisperModel
+from runpod.serverless.utils import rp_cuda
 
 MODEL_ID = "ivrit-ai/whisper-large-v3-turbo-ct2"
 
@@ -16,8 +19,6 @@ diarization_pipeline = None
 def load_whisper_model():
     """Load Hebrew whisper CT2 model into GPU memory."""
     global whisper_model
-    from faster_whisper import WhisperModel
-    from runpod.serverless.utils import rp_cuda
 
     device = "cuda" if rp_cuda.is_available() else "cpu"
     compute_type = "float16" if rp_cuda.is_available() else "int8"
@@ -34,8 +35,6 @@ def load_whisper_model():
 def load_diarization_pipeline():
     """Load pyannote speaker-diarization-3.1 pipeline."""
     global diarization_pipeline
-    import torch
-    from runpod.serverless.utils import rp_cuda
 
     hf_token = os.environ.get("HF_TOKEN")
     if not hf_token:

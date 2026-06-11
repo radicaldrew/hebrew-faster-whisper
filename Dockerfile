@@ -1,9 +1,10 @@
 # faster-whisper turbo needs cudnn >= 9
 FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
 
-# HuggingFace token for pyannote model access
+# HuggingFace token for pyannote model pre-cache (optional; runtime env
+# HF_TOKEN on the endpoint covers it otherwise). Scoped to the fetch RUN
+# only — never persisted as ENV in the image.
 ARG HF_TOKEN
-ENV HF_TOKEN=${HF_TOKEN}
 
 # Remove any third-party apt sources to avoid issues with expiring keys.
 RUN rm -f /etc/apt/sources.list.d/*.list
@@ -43,11 +44,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy and run script to fetch models (CT2 whisper models + pyannote pipeline)
 COPY builder/fetch_models.py /fetch_models.py
-RUN python /fetch_models.py && \
+RUN HF_TOKEN=${HF_TOKEN} python /fetch_models.py && \
     rm /fetch_models.py
-
-# Unset HF_TOKEN from build layer (will be provided at runtime via env var)
-ENV HF_TOKEN=""
 
 # Copy handler and other code
 COPY src .

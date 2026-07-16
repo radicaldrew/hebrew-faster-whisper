@@ -7,7 +7,7 @@
 
   added better hebrew model for hebrew language.
   added diarization for speaker recognition.
-
+  added runpod hf stability
 ---
 
 [![RunPod](https://api.runpod.io/badge/runpod-workers/worker-faster_whisper)](https://www.runpod.io/console/hub/runpod-workers/worker-faster_whisper)

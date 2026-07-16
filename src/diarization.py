@@ -5,16 +5,25 @@ Runs diarization on audio and aligns speaker labels with whisper segments/words.
 """
 
 from models import get_diarization_pipeline
+from utils import convert_to_wav, cleanup_file
 
 
 def run_diarization(audio_path: str):
     """
     Run speaker diarization on an audio file.
 
+    The input is first decoded to 16 kHz mono PCM WAV — pyannote crashes on
+    compressed containers whose declared duration disagrees with the decoded
+    sample count (see convert_to_wav).
+
     Returns pyannote Annotation object with speaker turns.
     """
     pipeline = get_diarization_pipeline()
-    diarization = pipeline(audio_path)
+    wav_path = convert_to_wav(audio_path)
+    try:
+        diarization = pipeline(wav_path)
+    finally:
+        cleanup_file(wav_path)
     return diarization
 
 

@@ -31,27 +31,38 @@ def download_ct2_model():
 
 
 def download_pyannote_pipeline():
-    """Pre-cache pyannote speaker-diarization-3.1 (gated; best-effort).
+    """Pre-cache pyannote speaker-diarization-3.1 (gated).
 
-    If this is skipped or fails, models.py downloads it at worker start
-    using the endpoint's runtime HF_TOKEN env var (~25MB, a few seconds).
+    Baking the model into the image is the point of passing HF_TOKEN at
+    build time — it removes the runtime dependency on huggingface.co at
+    worker cold start (a transient Hub outage there poisons the worker).
+    So if a token was provided and the fetch fails, FAIL THE BUILD instead
+    of silently shipping an image that must download at runtime.
+
+    Only when no token is given at all do we skip: models.py then downloads
+    at worker start using the endpoint's runtime HF_TOKEN env var.
     """
     if not HF_TOKEN:
-        print("Skipping pyannote pre-cache (no HF_TOKEN); will download at runtime.")
+        print("WARNING: Skipping pyannote pre-cache (no HF_TOKEN); "
+              "diarization will depend on a runtime download at cold start.")
         return
-    try:
-        from pyannote.audio import Pipeline
-        print("Downloading pyannote/speaker-diarization-3.1 pipeline...")
-        Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            use_auth_token=HF_TOKEN,
+    from pyannote.audio import Pipeline
+    print("Downloading pyannote/speaker-diarization-3.1 pipeline...")
+    pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization-3.1",
+        use_auth_token=HF_TOKEN,
+    )
+    if pipeline is None:
+        # from_pretrained returns None instead of raising on some failures
+        raise RuntimeError(
+            "pyannote pre-cache failed: Pipeline.from_pretrained returned None. "
+            "Check that the HF_TOKEN has accepted the gated-repo terms for both "
+            "pyannote/speaker-diarization-3.1 and pyannote/segmentation-3.0."
         )
-        print("Finished downloading pyannote pipeline.")
-    except Exception as e:
-        print(f"WARNING: pyannote pre-cache failed ({e}); will download at runtime.")
+    print("Finished downloading pyannote pipeline.")
 
 
 if __name__ == "__main__":
     download_ct2_model()  # required — fail the build if the public model won't fetch
-    download_pyannote_pipeline()  # best-effort
+    download_pyannote_pipeline()  # required when HF_TOKEN is set
     print("Model fetch complete.")

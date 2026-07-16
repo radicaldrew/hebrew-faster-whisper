@@ -78,7 +78,19 @@ def get_whisper_model():
 
 
 def get_diarization_pipeline():
-    """Get the loaded diarization pipeline."""
+    """Get the loaded diarization pipeline.
+
+    If the startup load failed (e.g. a transient Hub outage during cold
+    start), retry the load here instead of poisoning the worker for its
+    entire lifetime.
+    """
+    global diarization_load_error
+
+    if diarization_pipeline is None and os.environ.get("HF_TOKEN"):
+        print("Diarization pipeline not loaded; retrying load...", flush=True)
+        diarization_load_error = None
+        load_diarization_pipeline()
+
     if diarization_pipeline is None:
         detail = diarization_load_error or "HF_TOKEN not set"
         raise RuntimeError(

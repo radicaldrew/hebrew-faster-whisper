@@ -3,6 +3,7 @@ Utility functions for audio download and temp file management.
 """
 
 import os
+import subprocess
 import tempfile
 from urllib.parse import urlparse
 
@@ -53,6 +54,46 @@ def download_audio(url: str) -> str:
         tmp.close()
         cleanup_file(tmp.name)
         raise RuntimeError(f"Error writing audio to temp file: {e}") from e
+
+    return tmp.name
+
+
+def convert_to_wav(audio_path: str) -> str:
+    """
+    Decode audio to 16 kHz mono PCM WAV via ffmpeg.
+
+    pyannote batches fixed 10s windows (160000 samples @ 16 kHz) and crashes
+    with "Sizes of tensors must match except in dimension 0" when compressed
+    containers (mp3/m4a/webm, especially VBR) declare a duration that differs
+    from the actual decoded sample count. Decoding to plain PCM up front makes
+    the declared and actual lengths agree.
+
+    Returns:
+        Path to a new temporary .wav file. Caller owns cleanup.
+
+    Raises:
+        RuntimeError: If ffmpeg fails to decode the input.
+    """
+    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    tmp.close()
+
+    cmd = [
+        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-i", audio_path,
+        "-ac", "1",
+        "-ar", "16000",
+        "-c:a", "pcm_s16le",
+        "-vn",  # drop video streams (mp4/webm inputs)
+        tmp.name,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        cleanup_file(tmp.name)
+        stderr_tail = result.stderr.strip().splitlines()[-5:]
+        raise RuntimeError(
+            f"ffmpeg failed to decode audio ({result.returncode}): "
+            + " | ".join(stderr_tail)
+        )
 
     return tmp.name
 

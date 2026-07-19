@@ -13,6 +13,16 @@ INPUT_VALIDATIONS = {
         'required': False,
         'default': False
     },
+    'num_speakers': {
+        'type': int,
+        'required': False,
+        'default': None
+    },
+    'split_channels': {
+        'type': bool,
+        'required': False,
+        'default': False
+    },
     'word_timestamps': {
         'type': bool,
         'required': False,

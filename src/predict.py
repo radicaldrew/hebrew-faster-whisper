@@ -57,3 +57,44 @@ def transcribe(audio_path: str, word_timestamps: bool = False,
         "language": info.language,
         "duration": round(info.duration, 2),
     }
+
+
+DUAL_CHANNEL_SPEAKERS = ("SPEAKER_00", "SPEAKER_01")
+
+
+def transcribe_dual(audio_path_a: str, audio_path_b: str,
+                    word_timestamps: bool = False) -> dict:
+    """
+    Transcribe two single-speaker recordings of the same call and merge them.
+
+    Each file is one party's side (e.g. PBX call legs). Both recordings must
+    start at the same instant — timestamps are taken as-is and interleaved.
+    The file itself identifies the speaker, so labels are exact and no
+    diarization model is involved.
+
+    Returns:
+        Dict with 'segments' (speaker-tagged, sorted by start), 'language',
+        and 'duration' (max of the two files — they cover the same call).
+    """
+    merged = []
+    duration = 0.0
+    language = None
+
+    for path, speaker in ((audio_path_a, DUAL_CHANNEL_SPEAKERS[0]),
+                          (audio_path_b, DUAL_CHANNEL_SPEAKERS[1])):
+        result = transcribe(path, word_timestamps=word_timestamps)
+        for seg in result["segments"]:
+            seg["speaker"] = speaker
+            for word in seg.get("words", []):
+                word["speaker"] = speaker
+            merged.append(seg)
+        duration = max(duration, result["duration"])
+        language = language or result["language"]
+
+    merged.sort(key=lambda s: s["start"])
+
+    return {
+        "segments": merged,
+        "language": language,
+        "duration": duration,
+    }

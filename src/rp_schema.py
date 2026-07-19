@@ -3,6 +3,11 @@ INPUT_VALIDATIONS = {
         'type': str,
         'required': True,
     },
+    'audio_url_2': {
+        'type': str,
+        'required': False,
+        'default': None
+    },
     'diarize': {
         'type': bool,
         'required': False,

@@ -71,8 +71,10 @@ DUAL_CHANNEL_SPEAKERS = ("SPEAKER_00", "SPEAKER_01")
 # the default VAD (threshold 0.5, 2s min-silence) both misses faint far-end
 # speech and glues words from different utterances into one whisper segment
 # whose restored timestamps then span tens of seconds.
+# NOTE: faster-whisper 1.1.0 names the speech threshold `onset` (older
+# releases called it `threshold` — passing that raises TypeError).
 DUAL_VAD_PARAMETERS = {
-    "threshold": 0.35,
+    "onset": 0.35,
     "min_silence_duration_ms": 1000,
     "speech_pad_ms": 400,
 }

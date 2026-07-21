@@ -132,10 +132,16 @@ def split_stereo_channels(audio_path: str):
     right = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     right.close()
 
+    # aformat forces a plain `mono` layout — channelsplit tags its outputs
+    # FL/FR, which makes the WAV muxer emit WAVE_FORMAT_EXTENSIBLE headers
+    # that downstream stdlib readers can't parse.
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-i", audio_path,
-        "-filter_complex", "[0:a]channelsplit=channel_layout=stereo[L][R]",
+        "-filter_complex",
+        "[0:a]channelsplit=channel_layout=stereo[Lr][Rr];"
+        "[Lr]aformat=channel_layouts=mono[L];"
+        "[Rr]aformat=channel_layouts=mono[R]",
         "-map", "[L]", "-ar", "16000", "-c:a", "pcm_s16le", left.name,
         "-map", "[R]", "-ar", "16000", "-c:a", "pcm_s16le", right.name,
     ]
@@ -161,16 +167,26 @@ def channels_nearly_identical(left_path: str, right_path: str,
     the whole call twice (once per fake speaker), so the caller must fall back
     to model-based diarization when this returns True. Compares up to
     sample_seconds of both channels by normalized correlation.
-    """
-    import wave
 
+    Samples are decoded via ffmpeg rather than the stdlib wave module — the
+    latter rejects WAVE_FORMAT_EXTENSIBLE headers (format 0xFFFE), which some
+    ffmpeg builds emit for channel-split output.
+    """
     import numpy as np
 
     def read_samples(path):
-        with wave.open(path, "rb") as w:
-            n = min(w.getnframes(), w.getframerate() * sample_seconds)
-            data = w.readframes(n)
-        return np.frombuffer(data, dtype=np.int16).astype(np.float32)
+        cmd = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error",
+            "-t", str(sample_seconds),
+            "-i", path,
+            "-f", "s16le", "-ac", "1", "-ar", "16000", "-",
+        ]
+        result = subprocess.run(cmd, capture_output=True)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"ffmpeg failed to decode {path} for dual-mono check"
+            )
+        return np.frombuffer(result.stdout, dtype=np.int16).astype(np.float32)
 
     a = read_samples(left_path)
     b = read_samples(right_path)

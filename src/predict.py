@@ -6,7 +6,7 @@ from models import get_whisper_model
 
 
 def transcribe(audio_path: str, word_timestamps: bool = False,
-               diarize: bool = False) -> dict:
+               diarize: bool = False, vad_parameters: dict = None) -> dict:
     """
     Run Hebrew transcription on an audio file.
 
@@ -14,6 +14,7 @@ def transcribe(audio_path: str, word_timestamps: bool = False,
         audio_path: Path to the audio file.
         word_timestamps: Whether to include word-level timestamps.
         diarize: If True, forces word_timestamps=True for alignment.
+        vad_parameters: Optional VAD tuning overrides (faster-whisper dict).
 
     Returns:
         Dict with 'segments', 'language', 'duration'.
@@ -24,12 +25,17 @@ def transcribe(audio_path: str, word_timestamps: bool = False,
     if diarize:
         word_timestamps = True
 
+    extra = {}
+    if vad_parameters:
+        extra["vad_parameters"] = vad_parameters
+
     segments_gen, info = model.transcribe(
         audio_path,
         language="he",
         beam_size=5,
         word_timestamps=word_timestamps,
         vad_filter=True,
+        **extra,
     )
 
     segments = []
@@ -61,6 +67,55 @@ def transcribe(audio_path: str, word_timestamps: bool = False,
 
 DUAL_CHANNEL_SPEAKERS = ("SPEAKER_00", "SPEAKER_01")
 
+# A single-speaker channel is mostly silence while the other party talks, so
+# the default VAD (threshold 0.5, 2s min-silence) both misses faint far-end
+# speech and glues words from different utterances into one whisper segment
+# whose restored timestamps then span tens of seconds.
+DUAL_VAD_PARAMETERS = {
+    "threshold": 0.35,
+    "min_silence_duration_ms": 1000,
+    "speech_pad_ms": 400,
+}
+
+# Words within one utterance are near-contiguous; a bigger intra-segment gap
+# means the VAD spliced separate utterances together — split there so the
+# timestamp-sorted merge interleaves turns correctly.
+MAX_INTRA_SEGMENT_WORD_GAP = 1.5
+
+
+def _split_segments_on_word_gaps(segments: list,
+                                 max_gap: float = MAX_INTRA_SEGMENT_WORD_GAP) -> list:
+    """Split segments wherever consecutive words are separated by silence the
+    VAD removed, and tighten each segment's bounds to its actual word span."""
+    out = []
+    for seg in segments:
+        words = seg.get("words")
+        if not words:
+            out.append(seg)
+            continue
+
+        runs = [[words[0]]]
+        for prev, word in zip(words, words[1:]):
+            if word["start"] - prev["end"] > max_gap:
+                runs.append([word])
+            else:
+                runs[-1].append(word)
+
+        if len(runs) == 1:
+            seg["start"] = words[0]["start"]
+            seg["end"] = words[-1]["end"]
+            out.append(seg)
+            continue
+
+        for run in runs:
+            out.append({
+                "start": run[0]["start"],
+                "end": run[-1]["end"],
+                "text": " ".join(w["word"] for w in run),
+                "words": run,
+            })
+    return out
+
 
 def transcribe_dual(audio_path_a: str, audio_path_b: str,
                     word_timestamps: bool = False) -> dict:
@@ -82,8 +137,9 @@ def transcribe_dual(audio_path_a: str, audio_path_b: str,
 
     for path, speaker in ((audio_path_a, DUAL_CHANNEL_SPEAKERS[0]),
                           (audio_path_b, DUAL_CHANNEL_SPEAKERS[1])):
-        result = transcribe(path, word_timestamps=word_timestamps)
-        for seg in result["segments"]:
+        result = transcribe(path, word_timestamps=word_timestamps,
+                            vad_parameters=DUAL_VAD_PARAMETERS)
+        for seg in _split_segments_on_word_gaps(result["segments"]):
             seg["speaker"] = speaker
             for word in seg.get("words", []):
                 word["speaker"] = speaker
